@@ -3,6 +3,8 @@
 Tiny Journal is a distraction-light journalling and notes firmware for the **M5Stack Cardputer**.  
 It stores plain-text notes on the SD card using simple folders and templates, and can optionally sync them to **Google Drive** over Wi-Fi.
 
+Audio notes can be recorded anywhere with opt + tab.
+
 ---
 
 ## Features
