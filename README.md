@@ -5,6 +5,8 @@ It stores plain-text notes on the SD card using simple folders and templates, an
 
 Audio notes can be recorded anywhere with opt + tab.
 
+Exit text editor with esc (fn + `)
+
 ---
 
 ## Features
