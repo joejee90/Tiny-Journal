@@ -5,6 +5,12 @@ It stores plain-text notes on the SD card using simple folders and templates, an
 
 Audio notes can be recorded anywhere with opt + tab.
 
+Word jump with opt + left/right arrow keys.
+
+Word delete with opt + backspace.
+
+Page up/down with opt + up/down arrow keys.
+
 Exit text editor with esc (fn + `)
 
 ---
