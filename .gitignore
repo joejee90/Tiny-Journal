@@ -1,0 +1,12 @@
+# macOS bits
+.DS_Store
+
+# Build artefacts
+build/
+*.bin
+*.elf
+*.map
+
+# Arduino backups / misc
+*.bak
+*.log
