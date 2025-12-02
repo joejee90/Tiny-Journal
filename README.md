@@ -17,6 +17,8 @@ Bluetooth keyboard support new for v2025.11.2
 
 Ctrl for word jump and word delete. Page up and down, Home and End supported.
 
+Generic Bluetooth Low Energy keyboards only (doesn't work with Apple Magic Keyboards).
+
 US and UK keyboard layouts only.
 
 ## Features
