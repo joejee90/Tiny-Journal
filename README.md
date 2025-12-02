@@ -13,7 +13,7 @@ Page up/down with opt + up/down arrow keys.
 
 Exit text editor with esc (fn + `)
 
-Bluetooth keyboard support new for v2025.11.2
+Bluetooth keyboard support new for v2025.11.2 - go to Bluetooth menu in sync and connectivity, set keyboard to pairing mode, press enter on Cardputer. After 15 seconds, it should automatically connect.
 
 Ctrl for word jump and word delete. Page up and down, Home and End supported.
 
