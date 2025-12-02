@@ -13,7 +13,11 @@ Page up/down with opt + up/down arrow keys.
 
 Exit text editor with esc (fn + `)
 
----
+Bluetooth keyboard support new for v2025.11.2
+
+Ctrl for word jump and word delete. Page up and down, Home and End supported.
+
+US and UK keyboard layouts only.
 
 ## Features
 
