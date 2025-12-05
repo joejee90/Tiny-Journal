@@ -36,6 +36,8 @@ static uint16_t editorBgColor = EDITOR_BG_COLOR;
 // 0 = green on black, 1 = amber, 2 = white on black, 3 = black on white
 static int editorThemeIndex = 0;
 
+// 0 = standard, 1 = large, 2 = cataracts mode
+static int editorFontSizeIndex = 0;
 
 // ---------- App mode ----------
 enum AppMode {
@@ -91,7 +93,14 @@ std::vector<VisualLine> visualLines;
 int maxCols = 0;
 int lineHeight = 0;
 int topBarHeight = 0;
+// Editor-visible lines (used by editor layout/scrolling)
 int visibleLines = 0;
+// Menu/list-visible lines (used by menus, Wi-Fi list, etc.)
+int listVisibleLines = 0;
+
+// Base font metrics for textSize = 1 (used to scale editor font)
+int baseCharWidth = 0;
+int baseLineHeight = 0;
 
 int firstVisibleLine = 0;  // Index into visualLines for top of screen
 
@@ -253,6 +262,7 @@ void saveToFile();
 void rebuildLayout();
 void computeCursorLineCol(int &outLine, int &outCol);
 void ensureCursorVisible();
+void applyEditorFontSize();
 void handleKeyboard();
 void handleKeyRepeat();
 void handleBtKeyRepeat();
@@ -454,12 +464,60 @@ void initDisplay() {
 
   topBarHeight = lineHeight + 4;
 
+  // Store base metrics for editor scaling (textSize = 1)
+  baseCharWidth = charWidth;
+  baseLineHeight = lineHeight;
+
+  // Menus / lists (Wi-Fi, etc.) always use the small font height
+  listVisibleLines = (screenH - topBarHeight) / lineHeight;
+  if (listVisibleLines < 1) listVisibleLines = 1;
+
+  // Set initial editor layout for current font size (standard)
+  applyEditorFontSize();
+}
+
+void applyEditorFontSize() {
+  // Scale mapping for editor layout:
+  //   0 = standard (1×)
+  //   1 = large (2×)
+  //   2 = cataracts mode (special: one giant char per screen)
+  if (baseCharWidth <= 0 || baseLineHeight <= 0) {
+    // Fallback if somehow not initialised
+    baseCharWidth = M5Cardputer.Display.textWidth("M");
+    baseLineHeight = M5Cardputer.Display.fontHeight();
+    if (baseCharWidth <= 0) baseCharWidth = 6;
+    if (baseLineHeight <= 0) baseLineHeight = 8;
+  }
+
+  int screenW = M5Cardputer.Display.width();
+  int screenH = M5Cardputer.Display.height();
+
+  if (editorFontSizeIndex == 2) {
+    // Cataracts mode: logically 1 column, 1 visible line in the editor.
+    // Menus/Wi-Fi use listVisibleLines instead, so they stay normal.
+    maxCols = 1;
+    visibleLines = 1;
+    if (maxCols < 1) maxCols = 1;
+    if (visibleLines < 1) visibleLines = 1;
+    return;
+  }
+
+  int scale = (editorFontSizeIndex == 0) ? 1 : 2;
+
+  int charWidth = baseCharWidth * scale;
+  int editorLineH = baseLineHeight * scale;
+
+  if (charWidth < 1) charWidth = 1;
+  if (editorLineH < 1) editorLineH = 1;
+
+  // These are used by the editor layout/wrapping logic
   maxCols = screenW / charWidth;
   if (maxCols < 1) maxCols = 1;
 
-  visibleLines = (screenH - topBarHeight) / lineHeight;
+  visibleLines = (screenH - topBarHeight) / editorLineH;
   if (visibleLines < 1) visibleLines = 1;
 }
+
 
 void initSD() {
   SPI.begin(SD_SPI_SCK_PIN, SD_SPI_MISO_PIN, SD_SPI_MOSI_PIN);
@@ -1206,10 +1264,9 @@ void disconnectWiFi() {
 }
 
 void loadAppearanceFromSD() {
-  // Default theme (0) is already set by globals; this only overrides if file exists.
-  if (!SD.begin(SD_SPI_CS_PIN, SPI, 25000000)) {
-    return;
-  }
+  // Default theme (0) and font size (0) are already set by globals;
+  // this only overrides if the config file exists.
+  // Assumes SD has already been initialised by initSD().
 
   if (!SD.exists(APPEARANCE_CFG_PATH)) {
     return;
@@ -1218,31 +1275,42 @@ void loadAppearanceFromSD() {
   File f = SD.open(APPEARANCE_CFG_PATH, FILE_READ);
   if (!f) return;
 
-  String line = f.readStringUntil('\n');
-  line.trim();
+  // Line 1: theme index (0–3), kept for backwards compatibility.
+  String line1 = f.readStringUntil('\n');
+  line1.trim();
+
+  // Line 2: font size index (0–2), optional for older files.
+  String line2 = f.readStringUntil('\n');
+  line2.trim();
+
   f.close();
 
-  if (line.length() == 0) return;
-
-  int idx = line.toInt();
-  if (idx < 0 || idx > 3) {
-    return;  // ignore invalid values
+  if (line1.length() > 0) {
+    int themeIdx = line1.toInt();
+    if (themeIdx >= 0 && themeIdx <= 3) {
+      applyEditorTheme(themeIdx);
+    }
   }
 
-  applyEditorTheme(idx);
+  if (line2.length() > 0) {
+    int fontIdx = line2.toInt();
+    if (fontIdx >= 0 && fontIdx <= 2) {
+      editorFontSizeIndex = fontIdx;
+      applyEditorFontSize();
+    }
+  }
 }
 
 void saveAppearanceToSD() {
-  if (!SD.begin(SD_SPI_CS_PIN, SPI, 25000000)) {
-    return;
-  }
+  // Assumes SD has already been initialised by initSD().
 
   SD.remove(APPEARANCE_CFG_PATH);
   File f = SD.open(APPEARANCE_CFG_PATH, FILE_WRITE);
   if (!f) return;
 
-  // Just store the theme index as a single integer line
+  // Store both theme and font size so appearance persists between power cycles.
   f.println(editorThemeIndex);
+  f.println(editorFontSizeIndex);
   f.close();
 }
 
@@ -1927,19 +1995,40 @@ void btNotifyCallback(NimBLERemoteCharacteristic *pRemoteCharacteristic,
   // Count every incoming report
   btReportCount++;
 
-  // Normalise the incoming data to a standard 8-byte keyboard report
+  // We'll normalise whatever we get into a standard 8-byte "keyboard style" report:
+  //   newReport[0] = modifiers
+  //   newReport[1] = reserved / first key (depending on layout)
+  //   newReport[2..7] = up to 6 keycodes
   uint8_t newReport[8] = { 0 };
-  size_t copyLen = length;
-  if (copyLen > 8) copyLen = 8;
-  for (size_t i = 0; i < copyLen; ++i) {
-    newReport[i] = pData[i];
-  }
+  uint8_t mods = 0;
+  int keyStart = 2;  // default for classic 8-byte boot reports
 
-  uint8_t mods = newReport[0];
+  if (length == 8) {
+    // Classic 8-byte boot keyboard report: [mods][reserved][key1..6]
+    size_t copyLen = length;
+    if (copyLen > 8) copyLen = 8;
+    for (size_t i = 0; i < copyLen; ++i) {
+      newReport[i] = pData[i];
+    }
+    mods = newReport[0];
+    keyStart = 2;
+  } else {
+    // Non-standard length (often ReportID + boot layout, or NKRO variants).
+    // Heuristic: skip the first raw byte (likely Report ID), and treat the
+    // following bytes as [mods][reserved/first key][key1..].
+    size_t payloadLen = length - 1;
+    size_t copyLen = payloadLen;
+    if (copyLen > 8) copyLen = 8;
+    for (size_t i = 0; i < copyLen; ++i) {
+      newReport[i] = pData[i + 1];
+    }
+    mods = newReport[0];
+    keyStart = 1;  // keys may begin as early as newReport[1] in this layout
+  }
 
   // Work out whether any non-modifier key is currently down
   bool anyDown = false;
-  for (int i = 2; i < 8; ++i) {
+  for (int i = keyStart; i < 8; ++i) {
     if (newReport[i] != 0) {
       anyDown = true;
       break;
@@ -1948,12 +2037,12 @@ void btNotifyCallback(NimBLERemoteCharacteristic *pRemoteCharacteristic,
 
   // For each key that is present in the NEW report but was NOT present
   // in the LAST report, generate a character and start the repeat timer.
-  for (int i = 2; i < 8; ++i) {
+  for (int i = keyStart; i < 8; ++i) {
     uint8_t key = newReport[i];
     if (key == 0) continue;
 
     bool alreadyDown = false;
-    for (int j = 2; j < 8; ++j) {
+    for (int j = keyStart; j < 8; ++j) {
       if (btLastReport[j] == key) {
         alreadyDown = true;
         break;
@@ -1983,6 +2072,7 @@ void btNotifyCallback(NimBLERemoteCharacteristic *pRemoteCharacteristic,
     btLastReport[i] = newReport[i];
   }
 }
+
 
 
 
@@ -2682,8 +2772,8 @@ void handleWiFiSetupKeys(const Keyboard_Class::KeysState &ks) {
         needsRedraw = true;
       } else if (c == '.') {
         if (wifiSelectedIndex < count - 1) wifiSelectedIndex++;
-        if (wifiSelectedIndex >= wifiScrollOffset + visibleLines) {
-          wifiScrollOffset = wifiSelectedIndex - visibleLines + 1;
+        if (wifiSelectedIndex >= wifiScrollOffset + listVisibleLines) {
+          wifiScrollOffset = wifiSelectedIndex - listVisibleLines + 1;
         }
         needsRedraw = true;
       }
@@ -3999,6 +4089,17 @@ void handleKeyboard() {
   bool escDown = false;
 #endif
 
+  bool shiftDown = false;
+#ifdef KEY_SHIFT
+  if (M5Cardputer.Keyboard.isKeyPressed(KEY_SHIFT)) shiftDown = true;
+#endif
+#ifdef KEY_LEFT_SHIFT
+  if (M5Cardputer.Keyboard.isKeyPressed(KEY_LEFT_SHIFT)) shiftDown = true;
+#endif
+#ifdef KEY_RIGHT_SHIFT
+  if (M5Cardputer.Keyboard.isKeyPressed(KEY_RIGHT_SHIFT)) shiftDown = true;
+#endif
+
 #ifdef KEY_TAB
   bool tabDown = M5Cardputer.Keyboard.isKeyPressed(KEY_TAB);
 #else
@@ -4070,28 +4171,29 @@ void handleKeyboard() {
       return;
     }
 
+    // Built-in keyboard: ';' = up, '.' = down in menus
     for (auto c : ks.word) {
       if (c == ';') {
         menuMoveUp();
         needsRedraw = true;
-        return;
       } else if (c == '.') {
         menuMoveDown();
         needsRedraw = true;
-        return;
       }
     }
+
     return;
   }
 
   // ===== MODE_EDITOR from here =====
 
-  if (tabDown && !fnDown && !optDown) {
+  if (tabDown && !fnDown && !optDown && !shiftDown) {
     insertTab();
     setLastAction(ACTION_INSERT_CHAR, '\t');
     needsRedraw = true;
     return;
   }
+
 
   if (ks.del) {
     if (fnDown) {
@@ -4160,10 +4262,13 @@ void handleKeyboard() {
     return;
   }
 
+  bool didNewline = false;
+
   for (auto c : ks.word) {
-    if (c == '\r' || c == '\n') {
+    if ((c == '\r' || c == '\n') && !didNewline) {
       insertNewline();
       setLastAction(ACTION_INSERT_CHAR, '\n');
+      didNewline = true;
     } else if (c == '\t') {
       insertTab();
       setLastAction(ACTION_INSERT_CHAR, '\t');
@@ -4173,7 +4278,7 @@ void handleKeyboard() {
     }
   }
 
-  if (ks.enter) {
+  if (ks.enter && !didNewline) {
     insertNewline();
     setLastAction(ACTION_INSERT_CHAR, '\n');
   }
@@ -4900,7 +5005,7 @@ int getMenuItemCount(MenuId menu) {
     case MENU_SETTINGS_EDITOR:
       return 2;
     case MENU_SETTINGS_APPEARANCE:
-      return 1;
+      return 2;
     case MENU_SETTINGS_SYNC:
       return 4;
     default:
@@ -4991,9 +5096,20 @@ String getMenuItemLabel(MenuId menu, int index) {
             }
             return String("Colour theme: ") + name;
           }
+
+        case 1:
+          {
+            const char *sizeName;
+            switch (editorFontSizeIndex) {
+              case 0: sizeName = "standard"; break;
+              case 1: sizeName = "large"; break;
+              case 2: sizeName = "cataracts mode"; break;
+              default: sizeName = "standard"; break;
+            }
+            return String("Font size: ") + sizeName;
+          }
       }
       break;
-
 
     case MENU_SETTINGS_STORAGE:
       switch (index) {
@@ -5004,6 +5120,7 @@ String getMenuItemLabel(MenuId menu, int index) {
         case 4: return "Factory reset (wipe SD)";
       }
       break;
+
 
 
 
@@ -5081,8 +5198,8 @@ void menuMoveDown() {
   if (menuSelectedIndex < count - 1) {
     menuSelectedIndex++;
   }
-  if (menuSelectedIndex >= menuScrollOffset + visibleLines) {
-    menuScrollOffset = menuSelectedIndex - visibleLines + 1;
+  if (menuSelectedIndex >= menuScrollOffset + listVisibleLines) {
+    menuScrollOffset = menuSelectedIndex - listVisibleLines + 1;
   }
 }
 
@@ -5256,10 +5373,10 @@ void menuSelect() {
       switch (menuSelectedIndex) {
         case 0:
           {
-            // Cycle through 0→1→2→3→0...
+            // Cycle colour theme
             int next = (editorThemeIndex + 1) % 4;
             applyEditorTheme(next);
-            saveAppearanceToSD();  // <-- persist selection
+            saveAppearanceToSD();
 
             const char *name = "Unknown";
             switch (editorThemeIndex) {
@@ -5270,6 +5387,30 @@ void menuSelect() {
             }
 
             String msg = String("Theme: ") + name;
+            showStatusMessage(msg, 1500);
+            break;
+          }
+
+        case 1:
+          {
+            // Cycle font size: 0 = standard, 1 = large, 2 = cataracts mode
+            editorFontSizeIndex = (editorFontSizeIndex + 1) % 3;
+
+            // Recalculate editor layout and re-wrap text
+            applyEditorFontSize();
+            saveAppearanceToSD();
+            rebuildLayout();
+            ensureCursorVisible();
+            needsRedraw = true;
+
+            const char *sizeName;
+            switch (editorFontSizeIndex) {
+              case 0: sizeName = "standard"; break;
+              case 1: sizeName = "large"; break;
+              case 2: sizeName = "cataracts mode"; break;
+              default: sizeName = "standard"; break;
+            }
+            String msg = String("Font size: ") + sizeName;
             showStatusMessage(msg, 1500);
             break;
           }
@@ -5488,7 +5629,7 @@ void drawAboutScreen() {
 
   // Intro
   M5Cardputer.Display.setCursor(3, y);
-  M5Cardputer.Display.print("Tiny Journal 2025.11.2");
+  M5Cardputer.Display.print("Tiny Journal 2025.12.1");
   y += lineHeight;
 
   M5Cardputer.Display.setCursor(3, y);
@@ -5595,7 +5736,7 @@ void drawWiFiSetup() {
       M5Cardputer.Display.setCursor(3, y);
       M5Cardputer.Display.print("Enter: rescan   Back: exit");
     } else {
-      for (int row = 0; row < visibleLines; ++row) {
+      for (int row = 0; row < listVisibleLines; ++row) {
         int idx = wifiScrollOffset + row;
         int y = startY + row * lineHeight;
         M5Cardputer.Display.fillRect(0, y, screenW, lineHeight, editorBgColor);
@@ -5671,8 +5812,11 @@ void drawEditor() {
   M5Cardputer.Display.fillScreen(BLACK);
 
   int screenW = M5Cardputer.Display.width();
-  int charWidth = M5Cardputer.Display.textWidth("M");
 
+  // Always use "small" text settings for status / word count bars
+  M5Cardputer.Display.setTextSize(1);
+
+  // ----- Word count + saved status (top bar, unchanged size) -----
   size_t wordCount = 0;
   bool inWord = false;
   for (size_t i = 0; i < (size_t)textBuffer.length(); ++i) {
@@ -5693,6 +5837,7 @@ void drawEditor() {
   char savedChar = bufferDirty ? 'x' : 'o';
   String savedStr = String("saved:") + savedChar;
 
+  // Top bar background
   M5Cardputer.Display.fillRect(0, 0, screenW, topBarHeight, WHITE);
 
   int textY = (topBarHeight - lineHeight) / 2;
@@ -5708,6 +5853,36 @@ void drawEditor() {
   M5Cardputer.Display.setCursor(savedX, textY);
   M5Cardputer.Display.print(savedStr);
 
+  // ----- Editor text (scaled font) -----
+  int scale;
+  if (editorFontSizeIndex == 0) {
+    // Standard
+    scale = 1;
+  } else if (editorFontSizeIndex == 1) {
+    // Large
+    scale = 2;
+  } else {
+    // Cataracts mode: choose the largest scale that keeps one giant character visible.
+    int screenH = M5Cardputer.Display.height();
+    int editorHeight = screenH - topBarHeight;
+    if (editorHeight < baseLineHeight) editorHeight = baseLineHeight;
+
+    int maxScaleY = editorHeight / baseLineHeight;
+    int maxScaleX = screenW / baseCharWidth;
+    if (maxScaleX < 1) maxScaleX = 1;
+    if (maxScaleY < 1) maxScaleY = 1;
+
+    // Use the limiting dimension so the character fits on screen.
+    scale = (maxScaleY < maxScaleX) ? maxScaleY : maxScaleX;
+    if (scale < 1) scale = 1;
+  }
+
+  int charWidth = baseCharWidth * scale;
+  int editorLineH = baseLineHeight * scale;
+  if (charWidth < 1) charWidth = 1;
+  if (editorLineH < 1) editorLineH = lineHeight;  // sensible fallback
+
+  M5Cardputer.Display.setTextSize(scale);
   M5Cardputer.Display.setTextColor(editorFgColor, editorBgColor);
 
   int cursorLine, cursorCol;
@@ -5717,9 +5892,10 @@ void drawEditor() {
 
   for (int row = 0; row < visibleLines; ++row) {
     int lineIndex = firstVisibleLine + row;
-    int y = startY + row * lineHeight;
+    int y = startY + row * editorLineH;
 
-    M5Cardputer.Display.fillRect(0, y, screenW, lineHeight, editorBgColor);
+    // Clear the line background in editor colours
+    M5Cardputer.Display.fillRect(0, y, screenW, editorLineH, editorBgColor);
 
     if (lineIndex < 0 || lineIndex >= (int)visualLines.size()) {
       continue;
@@ -5732,6 +5908,7 @@ void drawEditor() {
     while (idx < vl.end) {
       char c = textBuffer[idx];
       int charCols = 1;
+
       if (c == '\t') {
         int remaining = TAB_SIZE - (col % TAB_SIZE);
         if (remaining <= 0) remaining = TAB_SIZE;
@@ -5749,7 +5926,6 @@ void drawEditor() {
         } else {
           M5Cardputer.Display.setTextColor(editorFgColor, editorBgColor);
         }
-
 
         int charX = col * charWidth;
         M5Cardputer.Display.setCursor(charX, y);
@@ -5769,6 +5945,7 @@ void drawEditor() {
       idx++;
     }
 
+    // Draw cursor block if it's beyond the last character on this visual line
     if (lineIndex == cursorLine && cursorCol >= col && cursorCol < maxCols) {
       M5Cardputer.Display.setTextColor(editorBgColor, editorFgColor);
       int charX = cursorCol * charWidth;
@@ -5777,11 +5954,14 @@ void drawEditor() {
     }
   }
 
+  // ----- Bottom status message (keep small size) -----
+  M5Cardputer.Display.setTextSize(1);
+
   if (statusMessageUntil > millis() && statusMessage.length() > 0) {
-    int y = M5Cardputer.Display.height() - lineHeight;
-    M5Cardputer.Display.fillRect(0, y, screenW, lineHeight, editorBgColor);
+    int by = M5Cardputer.Display.height() - lineHeight;
+    M5Cardputer.Display.fillRect(0, by, screenW, lineHeight, editorBgColor);
     M5Cardputer.Display.setTextColor(editorFgColor, editorBgColor);
-    M5Cardputer.Display.setCursor(0, y);
+    M5Cardputer.Display.setCursor(0, by);
     M5Cardputer.Display.print(statusMessage);
   }
 
@@ -5841,7 +6021,7 @@ void drawMenu() {
   int startY = topBarHeight;
   int count = getMenuItemCount(currentMenu);
 
-  for (int row = 0; row < visibleLines; ++row) {
+  for (int row = 0; row < listVisibleLines; ++row) {
     int itemIndex = menuScrollOffset + row;
     int y = startY + row * lineHeight;
 
