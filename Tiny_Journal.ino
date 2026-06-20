@@ -75,6 +75,7 @@ uint32_t usbMscBlockCount = 0;
 
 // ---------- Editor settings ----------
 static const int TAB_SIZE = 4;
+static const int EDITOR_LEFT_MARGIN = 2;  // pixels of left padding in editor
 // Idle autosave delay: configurable from the Editor behaviour menu
 static unsigned long idleAutosaveDelayMs = 5000;  // default 5s
 
@@ -619,7 +620,7 @@ void applyEditorFontSize() {
     if (charWidth < 1) charWidth = 1;
     if (editorLineH < 1) editorLineH = 1;
 
-    maxCols = screenW / charWidth;
+    maxCols = (screenW - EDITOR_LEFT_MARGIN) / charWidth;
     if (maxCols < 1) maxCols = 1;
 
     visibleLines = (screenH - topBarHeight) / editorLineH;
@@ -628,16 +629,16 @@ void applyEditorFontSize() {
     return;
   }
 
-  int scale = (editorFontSizeIndex == 0) ? 1 : 2;
+  float scale = (editorFontSizeIndex == 0) ? 1.0f : 1.4f;
 
-  int charWidth = baseCharWidth * scale;
-  int editorLineH = baseLineHeight * scale;
+  int charWidth = (int)(baseCharWidth * scale);
+  int editorLineH = (int)(baseLineHeight * scale);
 
   if (charWidth < 1) charWidth = 1;
   if (editorLineH < 1) editorLineH = 1;
 
   // These are used by the editor layout/wrapping logic
-  maxCols = screenW / charWidth;
+  maxCols = (screenW - EDITOR_LEFT_MARGIN) / charWidth;
   if (maxCols < 1) maxCols = 1;
 
   visibleLines = (screenH - topBarHeight) / editorLineH;
@@ -6979,17 +6980,17 @@ void drawEditor() {
   M5Cardputer.Display.print(savedStr);
 
   // ----- Editor text (scaled font) -----
-  int scale;
+  float scale;
   if (editorFontSizeIndex == 0) {
-    scale = 1;
+    scale = 1.0f;
   } else if (editorFontSizeIndex == 1) {
-    scale = 2;
+    scale = 1.4f;
   } else {
-    scale = CATARACTS_TEXT_SCALE;
+    scale = (float)CATARACTS_TEXT_SCALE;
   }
 
-  int charWidth = baseCharWidth * scale;
-  int editorLineH = baseLineHeight * scale;
+  int charWidth = (int)(baseCharWidth * scale);
+  int editorLineH = (int)(baseLineHeight * scale);
   if (charWidth < 1) charWidth = 1;
   if (editorLineH < 1) editorLineH = lineHeight;
 
@@ -7025,7 +7026,7 @@ void drawEditor() {
           bool isCursorHere = (lineIndex == cursorLine && col == cursorCol);
           M5Cardputer.Display.setTextColor(isCursorHere ? editorBgColor : editorFgColor,
                                            isCursorHere ? editorFgColor : editorBgColor);
-          M5Cardputer.Display.setCursor(col * charWidth, y);
+          M5Cardputer.Display.setCursor(EDITOR_LEFT_MARGIN + col * charWidth, y);
           M5Cardputer.Display.print(' ');
           col++;
           if (col >= maxCols) break;
@@ -7034,7 +7035,7 @@ void drawEditor() {
         bool isCursorHere = (lineIndex == cursorLine && col == cursorCol);
         M5Cardputer.Display.setTextColor(isCursorHere ? editorBgColor : editorFgColor,
                                          isCursorHere ? editorFgColor : editorBgColor);
-        M5Cardputer.Display.setCursor(col * charWidth, y);
+        M5Cardputer.Display.setCursor(EDITOR_LEFT_MARGIN + col * charWidth, y);
         M5Cardputer.Display.print(utf8CharStringAt(idx));
         col += charCols;
       }
@@ -7046,7 +7047,7 @@ void drawEditor() {
     // Draw cursor block if it's beyond the last character on this visual line
     if (lineIndex == cursorLine && cursorCol >= col && cursorCol < maxCols) {
       M5Cardputer.Display.setTextColor(editorBgColor, editorFgColor);
-      int charX = cursorCol * charWidth;
+      int charX = EDITOR_LEFT_MARGIN + cursorCol * charWidth;
       M5Cardputer.Display.setCursor(charX, y);
       M5Cardputer.Display.print(' ');
     }
