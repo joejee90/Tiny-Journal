@@ -1,251 +1,197 @@
 # Tiny Journal (M5Stack Cardputer)
 
-Tiny Journal is a distraction-light journalling and notes firmware for the **M5Stack Cardputer**.  
-It stores plain-text notes on the SD card using simple folders and templates, and can optionally sync them to **Google Drive** over Wi-Fi.
+**V. 2026.11.14**
 
-Audio notes can be recorded anywhere with opt + tab.
+Write on the go with your Cardputer.
 
-Word jump with opt + left/right arrow keys.
+Tiny Journal is a distraction-light journalling and notes app for the M5Stack Cardputer. Write on its own keyboard, or pair a Bluetooth keyboard when you have a little more space. Your notes are ordinary UTF-8 text files on the SD card, so you can take them elsewhere whenever you like.
 
-Word delete with opt + backspace.
+There are templates, audio notes, a choice of text sizes and colours, optional Google Drive backup, and plain-text network printing. You don't need Wi-Fi or a Google account to write.
 
-Page up/down with opt + up/down arrow keys.
+## Getting started
 
-Exit text editor with esc (fn + `)
+1. Fit a FAT32 microSD card and start Tiny Journal.
+2. Set the date and time under **Settings → Date & time** before making dated notes. The saved clock is a software clock, so check it after a power-off.
+3. Start typing. On a fresh card, the app creates the journal folders and a blank note. Later starts reopen your last document.
+4. Press **Esc** (`Fn` + backtick on the Cardputer) to open the Main menu.
+5. Use **Writing menu → Text documents** to create a blank note, a daily entry, a note from a template, or open an existing document.
 
-Bluetooth keyboard support new for v2025.11.2 - go to Bluetooth menu in sync and connectivity, set keyboard to pairing mode, press enter on Cardputer. After 15 seconds, it should automatically connect.
+Notes save when you leave or switch documents, and after an idle period if idle autosave is enabled. The default is five seconds. A failed save keeps the unsaved indication; don't switch off until you've dealt with the error. Sudden power loss can still lose recent changes, so keep a separate backup of your SD card.
 
-Ctrl for word jump and word delete. Page up and down, Home and End supported.
+A copy of this guide is installed as `/journal/README.txt`. Choose **Read user guide** in the Main menu to read it on the Cardputer. The reader does not edit your note. Up/Down (or `;`/`.`) changes page; Enter or Esc returns. The app refreshes its own guide on upgrade; keep personal notes in the document folders. A pre-existing, unrecognised README is preserved and the guide is put in `/journal/Tiny-Journal-README.txt` instead.
 
-Generic Bluetooth Low Energy keyboards only (doesn't work with Apple Magic Keyboards).
+## Keys and navigation
 
-US and UK keyboard layouts only.
+On the built-in keyboard:
 
-Updates 2026.6.6:
-- USB mass storage support added.
-- Improved file structure.
-- Bluetooth keyboard support expanded.
-- Now opens last opened file.
-- Expanded Google Drive support, now sending audio notes.
-- Audio notes now cleaner.
-- Cataracts mode now usable instead of just a joke.
+| Keys | What they do |
+| --- | --- |
+| Fn + `;` / `.` / `,` / `/` | Up / down / left / right in the editor |
+| Opt + `,` / `/` | Jump to the previous / next word |
+| Opt + `;` / `.` | Page up / down |
+| Opt + Del | Delete the previous word |
+| Fn + Del | Delete the next character |
+| Opt + Tab | Record an audio note |
+| Ctrl + Space | Change layout in the editor or Bluetooth settings |
+| Ctrl + Z / Y | Undo / redo |
+| Ctrl + F | Find text; search is case-sensitive and wraps forward |
+| Fn + backtick | Esc: open the menu or return to the editor |
 
-## Features
+In ordinary menus, `;` and `.` move the selection, Enter selects and Del goes back. Long lists have a scrollbar. A selected item that is too wide scrolls sideways; the rest of the screen stays still.
 
-- Plain-text notes written directly on the Cardputer keyboard  
-- Category-based folder structure on SD:
-  - `daily`, `notes`, `meetings`, `projects`, `travel`, `misc`, `archive`
-- Template-driven note creation (daily notes, meeting notes, etc.)
-- Unique filenames for every note (even multiple notes on the same day)
-- Audio note recording to `/journal/audio` with export to `/journal/audio/export`
-- Optional Wi-Fi + Google Drive sync for notes and exported audio
-- On-device Wi-Fi setup UI (scan networks, enter password, save to SD)
-- Safe “initialise / reset journal” function to rebuild folders, templates, and config files
+An external keyboard supports arrows, Page Up/Down, Home/End, Ctrl+Home/End, Ctrl+Left/Right, Ctrl+Backspace/Delete, and the editing shortcuts above. Escape opens or backs out of menus. Ctrl+Space also changes layout in external-keyboard menus.
 
----
+The document and audio browsers accept W/S or `;`/`.` for navigation. Enter opens a document or plays a recording. In the document browser, **d** renames the selected document. In the audio browser, **d** deletes the selected recording and **Shift+D** requests deletion of the listed recordings (the browser lists up to 64). The storage tools can delete all recordings. Bulk deletion requires confirmation.
 
-## Requirements
+## Make it comfortable
 
-### Hardware
+Under **Settings → Appearance**, choose green, amber or white on black, or black on white.
 
-- M5Stack Cardputer (ESP32-S3)
-- microSD card formatted as **FAT32**
+Editor text cycles through Standard, Medium **1.4×**, Large **2×**, and Extra large (the original cataracts mode). Menu text has its own Standard / Medium / Large setting. The small help text at the bottom stays small.
 
-### Software
+Under **Settings → Editor behaviour**, choose anchored or classic cursor scrolling and idle autosave: Off, 1, 2, 5 or 10 seconds.
 
-- Arduino IDE 2.x
-- ESP32 / M5Stack board support
-- M5Stack Cardputer / M5Unified libraries (via Arduino Library Manager)
+Undo/redo history is limited to 32 KiB; individual snapshots over 16 KiB are not kept. Documents have a 128 KiB limit and a limit on wrapped lines and available memory. Files that are too large are refused rather than partly loaded. Splitting a long document into smaller notes helps.
 
----
+## Bluetooth keyboards and layouts
 
-## Building and flashing
+Go to **Settings → Sync & connectivity → Bluetooth keyboard**. Put the keyboard into pairing mode, select Scan / pair keyboard, then choose it from the list. Follow any passkey or confirmation prompts on the screen. Select an unused pairing channel on multi-device keyboards if you want to keep their other pairings.
 
-1. Clone the repo:
+This is **Bluetooth Low Energy HID** support. The ESP32-S3 does not support Classic Bluetooth keyboards. A keyboard being wireless does not necessarily mean it supports BLE; compatibility depends on its connection mode and HID reports. The ProtoArc XK01 TP has been the target for local testing, but there is no guarantee for every keyboard or every key.
 
-    git clone https://github.com/joejee90/Tiny-Journal.git
-    cd Tiny-Journal
+Available layouts are **US, UK, German, French, Spanish and Russian**. Select Layout and press Enter, or use Ctrl+Space. Caps Lock, AltGr and common dead-key combinations are supported. Latin and Cyrillic text are supported; CJK input methods, Arabic shaping and full emoji editing are not.
 
-2. Open the main `.ino` file (e.g. `sketch_nov29a.ino`) in **Arduino IDE**.
+Bluetooth settings also include:
 
-3. In **Tools → Board**, select the appropriate **M5Stack / Cardputer (ESP32-S3)** board.
+- **Bluetooth On/Off:** manual Off is remembered across restarts. Saved bonds are kept.
+- **Power-on connect On/Off:** independently controls automatic connection to a remembered keyboard. Turning this off does not disconnect a working keyboard.
+- **Forget saved keyboard:** removes the saved pairing.
 
-4. Select the correct **Port** for your Cardputer.
+Automatic connection gets three attempts. If all three fail, Bluetooth shuts down for that attempt cycle. It can try again on the next boot if Bluetooth and power-on connection are enabled. A dropped working connection starts another bounded reconnect cycle. With automatic connection disabled, use Scan / pair keyboard when you want to connect.
 
-5. Click **Verify** to compile, then **Upload** to flash the firmware.
+## Audio notes
 
-Alternatively, you can flash a prebuilt `.bin` from the **Releases** page using **M5Burner** or `esptool.py`.
+Press **Opt+Tab**, or use **Writing menu → Audio notes → Record new note**. Any key stops recording. Use the audio browser to play recordings back.
 
----
+Recordings are WAV files in `/journal/audio`. The app also recognises `/journal/audio/export` for files placed there; there is no separate automatic export step. Interrupted recordings may be recovered from `.wav.part` files on the next normal boot.
 
-## SD card layout
+## Moving files over USB
 
-On first run, Tiny Journal will create a `/journal` folder on the SD card and set everything up:
+Choose **Enter USB storage mode** in the Main menu. The app saves first, restarts into storage mode, and makes the SD card available to the computer.
 
-    /journal
-      /templates
-      /daily
-      /notes
-      /meetings
-      /projects
-      /travel
-      /misc
-      /archive
-      /audio
-        /export
-      wifi.cfg
-      gdrive.cfg
-      theme.cfg
-      CONFIG-README.txt
+**Eject the disk on the computer before pressing a Cardputer key to leave storage mode.** While the computer owns the card, the journal does not edit it. An empty removable device can appear during normal journal use; the card becomes available only in storage mode.
 
-- **Templates** in `/journal/templates` are used as the starting text for new notes.  
-- **Audio notes** are recorded under `/journal/audio`; exported audio files go to `/journal/audio/export`.  
-- `CONFIG-README.txt` is a plain-text guide written by the firmware to explain the config files on-device.
+USB serial reboot requests are ignored during storage mode. Leave storage mode before uploading firmware. If discovery fails, check the cable supports data and that the computer sees the Cardputer; the storage screen alone is not proof of a successful connection.
 
----
+## Wi-Fi and Google Drive
 
-## Configuration files
+Wi-Fi setup is under **Settings → Sync & connectivity → WiFi setup**. Scan, choose a network, enter its password and save it.
 
-The firmware auto-generates placeholder config files and a helper file:
+Google Drive is optional **upload backup**, not two-way synchronisation. It uploads notes and WAV files from both audio folders. It does not download edits made in Drive. Changed files update their tracked remote copy; unchanged files are skipped. Duplicate files created by older firmware are not automatically removed.
 
-- `/journal/wifi.cfg`
-- `/journal/gdrive.cfg`
-- `/journal/theme.cfg`
-- `/journal/CONFIG-README.txt`
+For Drive, you need your own Google OAuth client, a refresh token and a destination folder ID. Put these four lines in `/journal/config/gdrive.cfg`:
 
-You can edit them either:
+```text
+YOUR_REFRESH_TOKEN
+YOUR_CLIENT_ID
+YOUR_CLIENT_SECRET
+YOUR_DRIVE_FOLDER_ID
+```
 
-- on your computer with a text editor, or  
-- via the built-in settings menus on the Cardputer.
+This takes more setup than Wi-Fi alone. You can skip it and use USB instead. When configured, choose **Settings → Sync & connectivity → Sync now**.
 
-### Wi-Fi config: `wifi.cfg`
+Connections to Google verify TLS certificates. The clock must be valid; the app requests network time when needed and stops if it cannot establish a verified connection. It does not fall back to an insecure connection.
 
-**Path:** `/journal/wifi.cfg`  
-**Format:** two lines only
+Credentials are **plain text on the SD card**. TLS protects their connection to Google, not a lost card. Don't share your config files or include them in bug reports. Keep `/journal/config/drive` with your backups: its remote IDs and hashes are what let later uploads update existing files safely. A missing or inaccessible remote file reports an error rather than silently creating another copy.
 
-Line 1: WiFi SSID  
-Line 2: WiFi password  
+## Network receipt printing
 
-Example:
+Use **Settings → Sync & connectivity → Network printer setup**. Enter your printer's own address and port (usually **9100**), set its paper columns, then send a test receipt. Wi-Fi credentials must already be configured.
 
-    MyHomeWiFi
-    supersecretpassword123
+The printer needs to accept **plain-text ESC/POS over TCP**. USB-only and Bluetooth-only printers are not supported by this feature. Set the address for your own network; no personal printer address is built into the firmware.
 
-On first run, the firmware creates something like:
+**Print current note** saves first and sends a snapshot. Optional **Print on Enter** sends completed logical lines as you type. Completed receipts feed and cut by default; switch cutting off for a printer without a cutter. Live lines do not cut. Later edits cannot change paper already printed.
 
-    YourSSIDHere
-    YourPasswordHere
+The stream selects CP437, including UK £ and common Latin accents. Unsupported characters become `?`; printer text support is narrower than the editor's language support. Print jobs are limited to a total 32 KiB queue. A send error may leave a partly printed receipt, so check the printer before retrying. “Job sent” means the data was sent, not that paper definitely came out.
 
-You can:
+Raw network printing is unencrypted. Use it on your trusted local network and keep the printer port off the public internet.
 
-- edit the file directly on the SD card, or  
-- configure Wi-Fi on the device:
+## SD folders, templates and backups
 
-> `Fn` + `` ` `` → **Settings** → **Sync & connectivity** → **WiFi setup**
+```text
+/journal/
+  README.txt
+  config/
+    wifi.cfg
+    gdrive.cfg
+    theme.cfg
+    btkeyboard.cfg
+    printer.cfg
+    rtc.txt
+    lastfile.txt
+    CONFIG-README.txt
+    drive/
+  templates/
+  daily/
+  notes/
+  meetings/
+  projects/
+  travel/
+  misc/
+  archive/
+  audio/
+    export/
+```
 
-(the same steps are described on-device in `CONFIG-README.txt`).
+Older root-level config files are migrated into `config` when possible. Wi-Fi configuration is two lines: SSID, then password. Printer configuration is JSON; use its menu unless you want to edit it yourself.
 
-### Google Drive config: `gdrive.cfg`
+Templates live in `/journal/templates` and support `{{DATE}}`, `{{TIME}}` and `{{DATE_LONG}}`. Use the supplied templates as examples for creating your own. Up to 32 templates are listed; each file must fit the document limit. Keep metadata lines below 512 bytes and the leading metadata header below 4 KiB. Oversized templates are refused.
 
-**Path:** `/journal/gdrive.cfg`  
-**Format:** four lines
+A checked save writes and verifies a temporary file, keeps the prior revision as `.bak`, then installs the new file. Boot recovery handles interrupted replacements. The `.bak` is normally one revision old, not a full history. Back up the entire journal folder, including config and Drive tracking, somewhere separate from the SD card.
 
-Line 1: `refresh_token`  
-Line 2: `client_id`  
-Line 3: `client_secret`  
-Line 4: `folder_id`  
+**Settings → Storage & SD tools** includes deletion and reset tools. Read each confirmation carefully: deleting notes or resetting the journal is a fresh start, not a backup operation. Unrelated files outside the journal are preserved.
 
-On first run the firmware writes placeholder values, for example:
+## Building from source
 
-    YOUR_REFRESH_TOKEN_HERE
-    YOUR_CLIENT_ID_HERE
-    YOUR_CLIENT_SECRET_HERE
-    YOUR_DRIVE_FOLDER_ID_HERE
+Tested hardware is the original **M5Stack Cardputer (ESP32-S3)** with a FAT32 microSD card. Other Cardputer variants have not been validated in this release.
 
-You need to replace these with real values from your own **Google Cloud** project and Google Drive:
+Use Arduino IDE 2.x and these tested dependencies:
 
-- `refresh_token` — OAuth refresh token for your app  
-- `client_id` — from the OAuth client in Google Cloud Console  
-- `client_secret` — from the same OAuth client  
-- `folder_id` — the ID of the Google Drive folder to sync into  
+| Component | Version |
+| --- | --- |
+| M5Stack ESP32 board package | **3.2.2** |
+| M5Cardputer | **1.1.1** |
+| M5Unified | **0.3.0** |
+| M5GFX | **0.3.0** |
+| NimBLE-Arduino | **2.5.1** |
+| ArduinoJson | **7.4.3** |
 
-This project assumes you already know how to:
+The M5Stack board index is <https://static-cdn.m5stack.com/resource/arduino/package_m5stack_index.json>.
 
-- create an OAuth client and obtain a refresh token, and  
-- find a Google Drive folder ID.  
+```sh
+git clone https://github.com/joejee90/Tiny-Journal.git Tiny_Journal
+cd Tiny_Journal
+```
 
-If you are not comfortable with Google’s APIs, this firmware is probably not the best starting tutorial.
+Open `Tiny_Journal.ino`, keeping all the accompanying `.h` and `.inl` files in the same sketch folder. Select M5Cardputer, **8 MB flash**, **Huge APP (3 MB)**, **USB-OTG/TinyUSB**, **USB CDC On Boot enabled**, and **USB-OTG CDC upload**. Keep **Erase All Flash disabled** when retaining settings and bonds. Verify, select the port and upload.
 
----
+Board package **3.3.10** was compared on the test Cardputer and produced invalid microphone capture. This release therefore uses **3.2.2**. That result is specific to the tested hardware and library combination; “latest” is not the tested configuration here.
 
-## Basic usage
+For Arduino CLI, `tools/setup-review-build.sh` installs the pinned dependencies into a separate sibling toolchain and builds the sketch. `tools/build.sh` uses already-installed dependencies. `tools/test.sh` runs the host regression checks. Python 3 and a C++17 compiler are needed for the checks. `tools/generate-guide.py --check` verifies that the embedded guide matches this README.
 
-### Navigation
+See [VALIDATION.md](VALIDATION.md) for checks performed and remaining hardware acceptance work, and [NETWORK-AND-PRINTING.md](NETWORK-AND-PRINTING.md) for network details. Some behaviour, especially Google account sync and keyboard compatibility, still needs testing with the actual account or hardware involved.
 
-- Use the cursor keys / D-pad to move the selection.  
-- **Enter** selects.  
-- On the Cardputer, **Esc** is `Fn` + `` ` `` (top-left key).
+## Changes in V. 2026.11.14
 
-### Notes and templates
-
-- Choose a category (e.g. **Daily**, **Notes**, **Meetings**).  
-- When you create a new note:
-  - The firmware loads a matching template from `/journal/templates`.  
-  - It saves the note into the category folder (e.g. `/journal/daily`).  
-  - Filenames are based on the date, with a numeric suffix added where needed to keep every note name unique.
-
-Notes are automatically saved when:
-
-- you exit the editor,  
-- you switch documents, or  
-- you power off the device.  
-
-There is no manual “Save” button; it writes changes as needed.
-
-### Audio notes
-
-- Audio is recorded into `/journal/audio`.  
-- Exported files (for use on a computer) are written to `/journal/audio/export`.  
-- Exported files are eligible for Google Drive sync (see below).
-
-### Google Drive sync
-
-Once `wifi.cfg` and `gdrive.cfg` are correctly filled in:
-
-On the Cardputer:
-
-> `Fn` + `` ` `` → **Settings** → **Sync & connectivity** → **Sync now**
-
-The status line will show:
-
-- Wi-Fi connect / fail  
-- Google auth success / failure  
-- Upload finished or aborted state  
-
-Tiny Journal attempts to sync:
-
-- text notes in the journal folders  
-- exported audio notes in `/journal/audio/export`  
-
-It deliberately **does not** upload:
-
-- `wifi.cfg`, `gdrive.cfg`, `theme.cfg`  
-- `CONFIG-README.txt`  
-- other internal config / system files  
-
----
-
-## Reset / initialise journal
-
-From the **Settings / Utilities** menu there is an option to **reset / initialise** the journal:
-
-- Re-creates the `/journal` folder structure.  
-- Restores default templates and placeholder config files.  
-- Lets you decide whether to **keep or delete** existing Wi-Fi and Google Drive configs.  
-
-This may delete existing notes and audio, so treat it as a “fresh start” option.
-
----
+- Added Medium 1.4× editor text, separate menu sizes and the two-pixel editor margin from TenoTrash's [PR #4](https://github.com/joejee90/Tiny-Journal/pull/4).
+- Added menu scrollbars, scrolling long selections, buffered row-only animation and small help text.
+- Expanded BLE keyboard/report handling, layouts, pairing controls and bounded reconnection.
+- Added undo/redo, search and bounded document loading.
+- Added checked saves, interrupted-save/recording recovery and stronger storage transitions.
+- Repaired USB interface registration and protected storage mode from serial-triggered reboots.
+- Added verified Google TLS and remote-file tracking for safer upload retries.
+- Added configurable network receipt printing, live lines and optional cutting.
+- Added this on-device guide and the release-review safety fixes documented in validation.
 
 ## Licence
 

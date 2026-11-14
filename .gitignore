@@ -1,12 +1,13 @@
-# macOS bits
-.DS_Store
-
-# Build artefacts
 build/
 *.bin
 *.elf
 *.map
+.DS_Store
 
-# Arduino backups / misc
-*.bak
-*.log
+# Device state and local review/recovery material are never release source.
+/journal/
+/Backups/
+/ReviewToolchain/
+*.bundle
+__pycache__/
+*.pyc
